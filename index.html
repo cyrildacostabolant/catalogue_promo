@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Générateur de Page A4 Supermarché</title>
+    <title>Assemblage promo tracts</title>
     <style>
         /* --- Reset & Base --- */
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -178,7 +178,7 @@
     <!-- Panneau de contrôle (Gauche) -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <h1>Générateur A4</h1>
+            <h1>Assemblage promo tracts</h1>
             <p class="subtitle">Sélectionnez une zone et faites <b>CTRL+V</b> pour coller une capture.</p>
         </div>
         
@@ -424,7 +424,7 @@
             const maxWidth = 794 - 20; // Largeur max d'une image (A4 width - padding gauche/droite)
 
             let minScale = 0.01;
-            let maxScale = 10.0;
+            let maxScale = 1.2; // Limite l'agrandissement à 120% maximum
             let bestScale = 0.01;
 
             // 40 itérations suffisent largement pour une précision au pixel près
