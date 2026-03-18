@@ -1,0 +1,14 @@
+{
+  "name": "a4-generator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "build": "echo 'No build step required'",
+    "start": "npx serve . -p 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}

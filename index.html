@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Page A4 Supermarché</title>
+    <style>
+        /* --- Reset & Base --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            height: 100vh; 
+            background-color: #f0f2f5; 
+            color: #333; 
+        }
+
+        /* --- Layout Principal --- */
+        .sidebar { 
+            width: 400px; 
+            background: #fff; 
+            border-right: 1px solid #ddd; 
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #ddd; background: #fafafa; }
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 20px; }
+        .sidebar-footer { padding: 20px; border-top: 1px solid #ddd; background: #fafafa; }
+        
+        .main-content { 
+            flex: 1; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; /* Permet de scroller si l'écran est petit */
+            overflow: auto; 
+            padding: 40px; 
+            background: #e0e0e0; 
+        }
+
+        /* --- Typographie --- */
+        h1 { font-size: 1.4rem; margin-bottom: 5px; color: #111; }
+        h2 { font-size: 1.1rem; margin-bottom: 15px; color: #444; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        p.subtitle { font-size: 0.85rem; color: #666; }
+
+        /* --- Zones d'Upload --- */
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 20px;
+            position: relative;
+            background: #fafafa;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            outline: none; /* Pour le focus */
+        }
+        .upload-zone:hover, .upload-zone:focus { 
+            border-color: #007bff; 
+            background-color: #f8fbff; 
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        .upload-zone.dragover { 
+            border-color: #28a745; 
+            background-color: #f0fff4; 
+        }
+        .upload-zone input[type="file"] { display: none; }
+        .upload-zone img.preview-img { 
+            max-width: 100%; 
+            max-height: 160px; 
+            border-radius: 4px; 
+            margin-top: 10px; 
+            display: none; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .upload-zone .placeholder { color: #777; font-size: 0.9rem; pointer-events: none; }
+        .upload-zone .placeholder-icon { font-size: 2rem; color: #ccc; margin-bottom: 10px; }
+        
+        /* Bouton de suppression sur les images */
+        .upload-zone .remove-btn {
+            position: absolute; 
+            top: -10px; 
+            right: -10px; 
+            background: #ff4d4f; 
+            color: white;
+            border: none; 
+            border-radius: 50%; 
+            width: 28px; 
+            height: 28px; 
+            cursor: pointer;
+            display: none; 
+            font-weight: bold; 
+            font-size: 16px;
+            line-height: 1;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        .upload-zone .remove-btn:hover { transform: scale(1.1); background: #ff7875; }
+
+        /* États de la zone d'upload */
+        .upload-zone.has-image .placeholder { display: none; }
+        .upload-zone.has-image .placeholder-icon { display: none; }
+        .upload-zone.has-image img.preview-img { display: block; }
+        .upload-zone.has-image .remove-btn { display: block; }
+
+        /* --- Boutons --- */
+        .btn {
+            display: block; 
+            width: 100%; 
+            padding: 12px; 
+            border: none; 
+            border-radius: 6px;
+            font-size: 1rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: background 0.2s, transform 0.1s;
+            text-align: center;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: #007bff; color: white; box-shadow: 0 4px 6px rgba(0,123,255,0.2); }
+        .btn-primary:hover { background: #0069d9; }
+        .btn-secondary { background: #e4e8ec; color: #333; margin-bottom: 20px; }
+        .btn-secondary:hover { background: #d2d8dd; }
+
+        /* --- Conteneur Page A4 --- */
+        .a4-container {
+            width: 794px; /* Équivalent 210mm à 96 DPI */
+            height: 1123px; /* Équivalent 297mm à 96 DPI */
+            background: white;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            position: relative;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow: hidden; /* Règle stricte : aucun débordement */
+        }
+
+        /* --- Éléments Générés sur la page A4 --- */
+        .gen-cover {
+            float: right;
+            height: 189px; /* Hauteur stricte de 5cm (approx 189px à 96 DPI) */
+            border: 4px solid #333; /* Bordure de 4px demandée */
+            margin: 0 0 10px 10px; /* Espace de 10px autour */
+            box-sizing: border-box;
+            /* Le ratio est conservé naturellement par le navigateur via la hauteur fixe */
+        }
+        .gen-article {
+            float: left;
+            margin: 0 10px 10px 0; /* Espace de 10px minimum entre les images */
+            border: 2px solid #333; /* Cadre de 2px autour des articles */
+            box-sizing: border-box;
+        }
+        .clear { clear: both; } /* Utilisé pour mesurer la hauteur totale des éléments flottants */
+
+        /* --- Impression --- */
+        @media print {
+            @page { margin: 0; size: A4; }
+            body { background: white; display: block; height: auto; }
+            .sidebar { display: none !important; }
+            .main-content { padding: 0 !important; background: transparent !important; display: block; overflow: visible !important; }
+            .a4-container { 
+                box-shadow: none !important; 
+                width: 210mm !important; 
+                height: 297mm !important; 
+                margin: 0 !important; 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Panneau de contrôle (Gauche) -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>Générateur A4</h1>
+            <p class="subtitle">Sélectionnez une zone et faites <b>CTRL+V</b> pour coller une capture.</p>
+        </div>
+        
+        <div class="sidebar-content" id="zones-container">
+            <h2>Couverture (Haut Droite)</h2>
+            <div class="upload-zone" id="zone-cover" tabindex="0" title="Sélectionnez puis CTRL+V">
+                <div class="placeholder-icon">📄</div>
+                <div class="placeholder">Collez (CTRL+V) l'image de couverture</div>
+                <img class="preview-img" src="" alt="Couverture">
+                <button class="remove-btn" title="Supprimer">&times;</button>
+            </div>
+
+            <h2>Articles</h2>
+            <div id="articles-list">
+                <!-- Les zones d'articles seront injectées ici dynamiquement -->
+            </div>
+            <button class="btn btn-secondary" id="btn-add-article">+ Ajouter un article</button>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="btn btn-primary" id="btn-generate">Générer la page A4</button>
+            <button class="btn" id="btn-print" style="display: none; margin-top: 10px; background: #28a745; color: white;">🖨️ Imprimer la page</button>
+        </div>
+    </div>
+
+    <!-- Zone de prévisualisation A4 (Droite) -->
+    <div class="main-content">
+        <div class="a4-container" id="a4-page">
+            <!-- Le rendu final sera généré ici -->
+        </div>
+    </div>
+
+    <script>
+        /**
+         * État global de l'application
+         */
+        let coverData = null; // Stocke { src, width, height } de la couverture
+        let articlesData = []; // Stocke un tableau de { id, data: { src, width, height } }
+        let articleIdCounter = 0;
+
+        // Références DOM
+        const zoneCover = document.getElementById('zone-cover');
+        const articlesList = document.getElementById('articles-list');
+        const btnAddArticle = document.getElementById('btn-add-article');
+        const btnGenerate = document.getElementById('btn-generate');
+        const btnPrint = document.getElementById('btn-print');
+        const a4Page = document.getElementById('a4-page');
+
+        /**
+         * Initialisation de l'application
+         */
+        function init() {
+            // Configuration de la zone de couverture
+            setupZone(zoneCover, (data) => { coverData = data; });
+            
+            // Ajout d'une première zone d'article par défaut
+            addArticleZone(); 
+            
+            // Écouteurs d'événements
+            btnAddArticle.addEventListener('click', addArticleZone);
+            btnGenerate.addEventListener('click', generateA4);
+            btnPrint.addEventListener('click', () => window.print());
+            
+            // Écouteur global pour le collage (CTRL+V)
+            document.addEventListener('paste', handleGlobalPaste);
+        }
+
+        /**
+         * Ajoute dynamiquement une nouvelle zone d'insertion d'article
+         */
+        function addArticleZone() {
+            const id = articleIdCounter++;
+            const zone = document.createElement('div');
+            zone.className = 'upload-zone';
+            zone.tabIndex = 0; // Rend la div focusable pour le CTRL+V
+            zone.dataset.id = id;
+            zone.innerHTML = `
+                <div class="placeholder-icon">🛒</div>
+                <div class="placeholder">Collez (CTRL+V) un article</div>
+                <img class="preview-img" src="" alt="Article">
+                <button class="remove-btn" title="Supprimer">&times;</button>
+            `;
+            articlesList.appendChild(zone);
+
+            // Ajout dans l'état global
+            articlesData.push({ id: id, data: null });
+
+            // Configuration des événements pour cette nouvelle zone
+            setupZone(zone, 
+                (data) => {
+                    // Callback de mise à jour des données
+                    const index = articlesData.findIndex(a => a.id === id);
+                    if (index !== -1) articlesData[index].data = data;
+                }, 
+                () => {
+                    // Callback de suppression de la zone
+                    const index = articlesData.findIndex(a => a.id === id);
+                    if (index !== -1) articlesData.splice(index, 1);
+                    zone.remove();
+                }
+            );
+        }
+
+        /**
+         * Configure les événements (focus, suppression) pour une zone d'upload
+         */
+        function setupZone(zone, onDataChange, onRemove = null) {
+            const removeBtn = zone.querySelector('.remove-btn');
+            const previewImg = zone.querySelector('.preview-img');
+
+            // Clic sur la zone -> Donne le focus pour préparer le CTRL+V
+            zone.addEventListener('click', (e) => {
+                if (e.target !== removeBtn) {
+                    zone.focus();
+                }
+            });
+
+            // Bouton de suppression
+            if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Empêche le clic de se propager à la zone
+                    if (onRemove) {
+                        onRemove(); // Supprime complètement la zone (pour les articles)
+                    } else {
+                        // Vide simplement la zone (pour la couverture)
+                        zone.classList.remove('has-image');
+                        previewImg.src = '';
+                        onDataChange(null);
+                    }
+                });
+            }
+        }
+
+        /**
+         * Gère l'événement de collage (CTRL+V) globalement
+         */
+        function handleGlobalPaste(e) {
+            const activeElement = document.activeElement;
+            // Vérifie si l'élément actif est une zone d'upload ou contenu dedans
+            const zone = activeElement.closest('.upload-zone');
+            if (!zone) return;
+
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let index in items) {
+                const item = items[index];
+                // On cherche un élément de type image
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                    const blob = item.getAsFile();
+                    const previewImg = zone.querySelector('.preview-img');
+                    
+                    // Détermine le bon callback selon la zone ciblée
+                    let onDataChange;
+                    if (zone.id === 'zone-cover') {
+                        onDataChange = (data) => { coverData = data; };
+                    } else {
+                        const id = parseInt(zone.dataset.id);
+                        onDataChange = (data) => {
+                            const idx = articlesData.findIndex(a => a.id === id);
+                            if (idx !== -1) articlesData[idx].data = data;
+                        };
+                    }
+                    
+                    processFile(blob, zone, previewImg, onDataChange);
+                    break; // On ne traite que la première image collée
+                }
+            }
+        }
+
+        /**
+         * Lit le fichier image, récupère ses dimensions et met à jour l'UI
+         */
+        function processFile(file, zone, previewImg, onDataChange) {
+            if (!file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const src = e.target.result;
+                const img = new Image();
+                
+                // On attend que l'image soit chargée en mémoire pour connaître ses dimensions naturelles
+                img.onload = () => {
+                    zone.classList.add('has-image');
+                    previewImg.src = src;
+                    
+                    // Transmission des données au callback
+                    onDataChange({
+                        src: src,
+                        width: img.naturalWidth,
+                        height: img.naturalHeight
+                    });
+                };
+                img.src = src;
+            };
+            reader.readAsDataURL(file); // Lecture asynchrone
+        }
+
+        /**
+         * Cœur de l'application : Algorithme de rendu et de mise en page A4
+         */
+        function generateA4() {
+            a4Page.innerHTML = ''; // Nettoyage de la page
+
+            // 1. Insertion de la couverture (si présente)
+            if (coverData) {
+                const coverImg = document.createElement('img');
+                coverImg.src = coverData.src;
+                coverImg.className = 'gen-cover';
+                a4Page.appendChild(coverImg);
+            }
+
+            // 2. Filtrage des articles valides (ceux qui ont une image)
+            const validArticles = articlesData.filter(a => a.data !== null).map(a => a.data);
+            if (validArticles.length === 0 && !coverData) return;
+
+            // 3. Injection des articles dans le DOM
+            const articleElements = [];
+            validArticles.forEach(data => {
+                const img = document.createElement('img');
+                img.src = data.src;
+                img.className = 'gen-article';
+                // On stocke les dimensions d'origine pour le calcul de redimensionnement
+                img.dataset.origWidth = data.width;
+                img.dataset.origHeight = data.height;
+                a4Page.appendChild(img);
+                articleElements.push(img);
+            });
+
+            // 4. Élément de mesure ("clear: both")
+            // Cet élément se place toujours en dessous de tous les éléments flottants.
+            // Son 'offsetTop' nous donnera la hauteur totale occupée par le contenu.
+            const clearDiv = document.createElement('div');
+            clearDiv.className = 'clear';
+            a4Page.appendChild(clearDiv);
+
+            if (articleElements.length === 0) return; // Rien à redimensionner
+
+            // 5. Algorithme de remplissage (Recherche Dichotomique / Binary Search)
+            // Objectif : Trouver le facteur d'échelle (scale) maximum pour que toutes les images 
+            // rentrent dans la page A4 sans déborder en hauteur.
+            
+            // Hauteur cible : 1123px - 10px (padding bas) = 1113px
+            const targetHeight = 1123 - 10; 
+            const maxWidth = 794 - 20; // Largeur max d'une image (A4 width - padding gauche/droite)
+
+            let minScale = 0.01;
+            let maxScale = 10.0;
+            let bestScale = 0.01;
+
+            // 40 itérations suffisent largement pour une précision au pixel près
+            for (let i = 0; i < 40; i++) {
+                let midScale = (minScale + maxScale) / 2;
+                
+                // Application du facteur d'échelle test
+                applyScale(articleElements, midScale, maxWidth);
+                
+                // Mesure de la hauteur résultante
+                if (clearDiv.offsetTop <= targetHeight) {
+                    // Ça rentre ! On sauvegarde ce scale et on essaie de faire plus grand
+                    bestScale = midScale;
+                    minScale = midScale; 
+                } else {
+                    // C'est trop grand, ça déborde. On doit réduire l'échelle.
+                    maxScale = midScale; 
+                }
+            }
+
+            // 6. Application du meilleur facteur d'échelle trouvé
+            applyScale(articleElements, bestScale, maxWidth);
+
+            // 7. Affichage du bouton d'impression
+            btnPrint.style.display = 'block';
+        }
+
+        /**
+         * Applique un facteur d'échelle aux images des articles
+         */
+        function applyScale(elements, scale, maxWidth) {
+            elements.forEach(img => {
+                let w = parseFloat(img.dataset.origWidth) * scale;
+                let h = parseFloat(img.dataset.origHeight) * scale;
+                
+                // Sécurité : Si une image seule est plus large que la page A4, 
+                // on la contraint à la largeur max tout en conservant son ratio.
+                if (w > maxWidth) {
+                    const ratio = maxWidth / w;
+                    w = maxWidth;
+                    h = h * ratio;
+                }
+                
+                img.style.width = w + 'px';
+                img.style.height = h + 'px';
+            });
+        }
+
+        // Démarrage de l'application
+        init();
+    </script>
+</body>
+</html>
