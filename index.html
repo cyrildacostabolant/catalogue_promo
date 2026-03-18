@@ -143,20 +143,21 @@
 
         /* --- Éléments Générés sur la page A4 --- */
         .gen-cover {
-            float: right;
+            position: absolute;
+            top: 10px;
+            right: 10px;
             height: 189px; /* Hauteur stricte de 5cm (approx 189px à 96 DPI) */
             border: 4px solid #333; /* Bordure de 4px demandée */
-            margin: 0 0 10px 10px; /* Espace de 10px autour */
             box-sizing: border-box;
+            z-index: 2;
             /* Le ratio est conservé naturellement par le navigateur via la hauteur fixe */
         }
         .gen-article {
-            float: left;
-            margin: 0 10px 10px 0; /* Espace de 10px minimum entre les images */
+            position: absolute;
             border: 2px solid #333; /* Cadre de 2px autour des articles */
             box-sizing: border-box;
+            transition: all 0.3s ease; /* Animation fluide lors du redimensionnement */
         }
-        .clear { clear: both; } /* Utilisé pour mesurer la hauteur totale des éléments flottants */
 
         /* --- Impression --- */
         @media print {
@@ -382,8 +383,9 @@
             a4Page.innerHTML = ''; // Nettoyage de la page
 
             // 1. Insertion de la couverture (si présente)
+            let coverImg = null;
             if (coverData) {
-                const coverImg = document.createElement('img');
+                coverImg = document.createElement('img');
                 coverImg.src = coverData.src;
                 coverImg.className = 'gen-cover';
                 a4Page.appendChild(coverImg);
@@ -406,22 +408,23 @@
                 articleElements.push(img);
             });
 
-            // 4. Élément de mesure ("clear: both")
-            // Cet élément se place toujours en dessous de tous les éléments flottants.
-            // Son 'offsetTop' nous donnera la hauteur totale occupée par le contenu.
-            const clearDiv = document.createElement('div');
-            clearDiv.className = 'clear';
-            a4Page.appendChild(clearDiv);
+            if (articleElements.length === 0) {
+                btnPrint.style.display = 'block';
+                return; // Rien à redimensionner
+            }
 
-            if (articleElements.length === 0) return; // Rien à redimensionner
-
-            // 5. Algorithme de remplissage (Recherche Dichotomique / Binary Search)
+            // 4. Algorithme de remplissage 2D (Recherche Dichotomique + Skyline)
             // Objectif : Trouver le facteur d'échelle (scale) maximum pour que toutes les images 
-            // rentrent dans la page A4 sans déborder en hauteur.
+            // rentrent dans la page A4 sans déborder en hauteur, en minimisant les espaces vides.
             
-            // Hauteur cible : 1123px - 10px (padding bas) = 1113px
-            const targetHeight = 1123 - 10; 
+            const targetHeight = 1123 - 20; // 10px padding haut + 10px padding bas
             const maxWidth = 794 - 20; // Largeur max d'une image (A4 width - padding gauche/droite)
+
+            let coverW = 0, coverH = 0;
+            if (coverImg) {
+                coverW = coverImg.offsetWidth;
+                coverH = coverImg.offsetHeight;
+            }
 
             let minScale = 0.01;
             let maxScale = 1.2; // Limite l'agrandissement à 120% maximum
@@ -431,11 +434,10 @@
             for (let i = 0; i < 40; i++) {
                 let midScale = (minScale + maxScale) / 2;
                 
-                // Application du facteur d'échelle test
-                applyScale(articleElements, midScale, maxWidth);
+                // Simulation du placement pour mesurer la hauteur
+                let currentHeight = packImages(articleElements, midScale, maxWidth, coverW, coverH, false);
                 
-                // Mesure de la hauteur résultante
-                if (clearDiv.offsetTop <= targetHeight) {
+                if (currentHeight <= targetHeight) {
                     // Ça rentre ! On sauvegarde ce scale et on essaie de faire plus grand
                     bestScale = midScale;
                     minScale = midScale; 
@@ -445,32 +447,82 @@
                 }
             }
 
-            // 6. Application du meilleur facteur d'échelle trouvé
-            applyScale(articleElements, bestScale, maxWidth);
+            // 5. Application du meilleur facteur d'échelle trouvé et placement final
+            packImages(articleElements, bestScale, maxWidth, coverW, coverH, true);
 
-            // 7. Affichage du bouton d'impression
+            // 6. Affichage du bouton d'impression
             btnPrint.style.display = 'block';
         }
 
         /**
-         * Applique un facteur d'échelle aux images des articles
+         * Algorithme de placement 2D (Skyline Bottom-Left)
+         * Place les images de manière compacte pour minimiser les espaces vides.
          */
-        function applyScale(elements, scale, maxWidth) {
-            elements.forEach(img => {
+        function packImages(elements, scale, maxWidth, coverW, coverH, applyToDom) {
+            const gap = 10;
+            const skyline = new Int32Array(Math.ceil(maxWidth));
+            
+            // Réserver l'espace pour la couverture en haut à droite
+            if (coverW > 0 && coverH > 0) {
+                const startX = Math.max(0, Math.ceil(maxWidth - coverW - gap));
+                for (let x = startX; x < skyline.length; x++) {
+                    skyline[x] = coverH + gap;
+                }
+            }
+
+            const items = elements.map(img => {
                 let w = parseFloat(img.dataset.origWidth) * scale;
                 let h = parseFloat(img.dataset.origHeight) * scale;
-                
-                // Sécurité : Si une image seule est plus large que la page A4, 
-                // on la contraint à la largeur max tout en conservant son ratio.
                 if (w > maxWidth) {
                     const ratio = maxWidth / w;
                     w = maxWidth;
                     h = h * ratio;
                 }
-                
-                img.style.width = w + 'px';
-                img.style.height = h + 'px';
+                return { img, w: Math.ceil(w), h: Math.ceil(h) };
             });
+
+            // Tri par aire décroissante pour un meilleur assemblage (minimise les trous)
+            items.sort((a, b) => (b.w * b.h) - (a.w * a.h));
+
+            for (const item of items) {
+                const w = item.w;
+                const h = item.h;
+                
+                let bestY = Infinity;
+                let bestX = 0;
+
+                const maxX = Math.ceil(maxWidth - w);
+                for (let x = 0; x <= maxX; x++) {
+                    let maxY = 0;
+                    for (let i = 0; i < w; i++) {
+                        if (skyline[x + i] > maxY) {
+                            maxY = skyline[x + i];
+                        }
+                    }
+                    if (maxY < bestY) {
+                        bestY = maxY;
+                        bestX = x;
+                    }
+                }
+
+                if (applyToDom) {
+                    item.img.style.left = (bestX + 10) + 'px'; // +10 pour le padding du conteneur
+                    item.img.style.top = (bestY + 10) + 'px';
+                    item.img.style.width = w + 'px';
+                    item.img.style.height = h + 'px';
+                }
+
+                const newY = bestY + h + gap;
+                for (let i = 0; i < w; i++) {
+                    skyline[bestX + i] = newY;
+                }
+            }
+            
+            let overallMax = 0;
+            for(let i = 0; i < skyline.length; i++) {
+                if(skyline[i] > overallMax) overallMax = skyline[i];
+            }
+            return overallMax - gap; // On retire le dernier gap pour la mesure exacte
         }
 
         // Démarrage de l'application
