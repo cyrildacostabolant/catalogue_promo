@@ -471,14 +471,20 @@
             }
 
             const items = elements.map(img => {
-                let w = parseFloat(img.dataset.origWidth) * scale;
-                let h = parseFloat(img.dataset.origHeight) * scale;
-
-                // Règle : Si l'image est plus large que la moitié de la page, réduction de 20%
-                if (w > maxWidth / 2) {
-                    w *= 0.8;
-                    h *= 0.8;
+                const origW = parseFloat(img.dataset.origWidth);
+                const origH = parseFloat(img.dataset.origHeight);
+                
+                // Facteur de réduction spécifique pour les grandes images
+                // On se base sur la largeur d'origine par rapport à la page
+                let individualFactor = 1.0;
+                if (origW > maxWidth * 0.45) {
+                    // Si l'image est intrinsèquement large, on lui applique une réduction forte (40%)
+                    // pour libérer de l'espace pour les petites
+                    individualFactor = 0.6; 
                 }
+
+                let w = origW * individualFactor * scale;
+                let h = origH * individualFactor * scale;
 
                 if (w > maxWidth) {
                     const ratio = maxWidth / w;
@@ -488,7 +494,7 @@
                 return { img, w: Math.ceil(w), h: Math.ceil(h) };
             });
 
-            // Tri par aire décroissante pour un meilleur assemblage (minimise les trous)
+            // Tri par aire décroissante pour un meilleur assemblage
             items.sort((a, b) => (b.w * b.h) - (a.w * a.h));
 
             for (const item of items) {
@@ -501,7 +507,6 @@
                 const maxX = Math.ceil(maxWidth - w);
                 for (let x = 0; x <= maxX; x++) {
                     let maxY = 0;
-                    // On vérifie la skyline sur la largeur de l'image + le gap pour garantir l'espacement horizontal
                     const checkW = Math.min(w + gap, Math.ceil(maxWidth) - x);
                     for (let i = 0; i < checkW; i++) {
                         if (skyline[x + i] > maxY) {
@@ -515,14 +520,13 @@
                 }
 
                 if (applyToDom) {
-                    item.img.style.left = (bestX + 10) + 'px'; // +10 pour le padding du conteneur
+                    item.img.style.left = (bestX + 10) + 'px';
                     item.img.style.top = (bestY + 10) + 'px';
                     item.img.style.width = w + 'px';
                     item.img.style.height = h + 'px';
                 }
 
                 const newY = bestY + h + gap;
-                // On met à jour la skyline sur la largeur + gap pour bloquer l'espace horizontalement
                 const updateW = Math.min(w + gap, skyline.length - bestX);
                 for (let i = 0; i < updateW; i++) {
                     skyline[bestX + i] = newY;
@@ -533,7 +537,7 @@
             for(let i = 0; i < skyline.length; i++) {
                 if(skyline[i] > overallMax) overallMax = skyline[i];
             }
-            return overallMax - gap; // On retire le dernier gap pour la mesure exacte
+            return overallMax - gap;
         }
 
         // Démarrage de l'application
