@@ -473,6 +473,13 @@
             const items = elements.map(img => {
                 let w = parseFloat(img.dataset.origWidth) * scale;
                 let h = parseFloat(img.dataset.origHeight) * scale;
+
+                // Règle : Si l'image est plus large que la moitié de la page, réduction de 20%
+                if (w > maxWidth / 2) {
+                    w *= 0.8;
+                    h *= 0.8;
+                }
+
                 if (w > maxWidth) {
                     const ratio = maxWidth / w;
                     w = maxWidth;
@@ -494,7 +501,9 @@
                 const maxX = Math.ceil(maxWidth - w);
                 for (let x = 0; x <= maxX; x++) {
                     let maxY = 0;
-                    for (let i = 0; i < w; i++) {
+                    // On vérifie la skyline sur la largeur de l'image + le gap pour garantir l'espacement horizontal
+                    const checkW = Math.min(w + gap, Math.ceil(maxWidth) - x);
+                    for (let i = 0; i < checkW; i++) {
                         if (skyline[x + i] > maxY) {
                             maxY = skyline[x + i];
                         }
@@ -513,7 +522,9 @@
                 }
 
                 const newY = bestY + h + gap;
-                for (let i = 0; i < w; i++) {
+                // On met à jour la skyline sur la largeur + gap pour bloquer l'espace horizontalement
+                const updateW = Math.min(w + gap, skyline.length - bestX);
+                for (let i = 0; i < updateW; i++) {
                     skyline[bestX + i] = newY;
                 }
             }
