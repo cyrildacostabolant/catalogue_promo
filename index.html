@@ -152,6 +152,21 @@
             z-index: 2;
             /* Le ratio est conservé naturellement par le navigateur via la hauteur fixe */
         }
+        .gen-dates {
+            position: absolute;
+            top: 204px; /* 10px (padding) + 189px (cover) + 5px (gap) */
+            right: 10px;
+            width: auto;
+            max-width: 200px;
+            text-align: right;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            z-index: 2;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
         .gen-article {
             position: absolute;
             border: 2px solid #333; /* Cadre de 2px autour des articles */
@@ -192,6 +207,9 @@
                 <button class="remove-btn" title="Supprimer">&times;</button>
             </div>
 
+            <h2>Dates de validité</h2>
+            <input type="text" id="input-dates" class="btn" style="text-align: left; background: #fff; border: 1px solid #ccc; margin-bottom: 20px; font-weight: normal;" placeholder="Ex: Du 19 au 24 mai 2024">
+
             <h2>Articles</h2>
             <div id="articles-list">
                 <!-- Les zones d'articles seront injectées ici dynamiquement -->
@@ -227,6 +245,7 @@
         const btnGenerate = document.getElementById('btn-generate');
         const btnPrint = document.getElementById('btn-print');
         const a4Page = document.getElementById('a4-page');
+        const inputDates = document.getElementById('input-dates');
 
         /**
          * Initialisation de l'application
@@ -391,6 +410,16 @@
                 a4Page.appendChild(coverImg);
             }
 
+            // 1bis. Insertion des dates
+            const datesText = inputDates.value.trim();
+            let datesEl = null;
+            if (datesText) {
+                datesEl = document.createElement('div');
+                datesEl.className = 'gen-dates';
+                datesEl.textContent = datesText;
+                a4Page.appendChild(datesEl);
+            }
+
             // 2. Filtrage des articles valides (ceux qui ont une image)
             const validArticles = articlesData.filter(a => a.data !== null).map(a => a.data);
             if (validArticles.length === 0 && !coverData) return;
@@ -420,10 +449,22 @@
             const targetHeight = 1123 - 20; // 10px padding haut + 10px padding bas
             const maxWidth = 794 - 20; // Largeur max d'une image (A4 width - padding gauche/droite)
 
-            let coverW = 0, coverH = 0;
+            let reservationW = 0, reservationH = 0;
             if (coverImg) {
-                coverW = coverImg.offsetWidth;
-                coverH = coverImg.offsetHeight;
+                reservationW = coverImg.offsetWidth;
+                reservationH = coverImg.offsetHeight;
+                
+                // Si on a des dates, on augmente la hauteur réservée
+                if (datesEl) {
+                    // On estime la hauteur des dates à environ 25px (font 14px + padding)
+                    reservationH += 25; 
+                    // On s'assure que la largeur réservée couvre aussi les dates
+                    reservationW = Math.max(reservationW, 150); 
+                }
+            } else if (datesEl) {
+                // S'il n'y a QUE les dates (cas rare), on réserve quand même un petit bloc en haut à droite
+                reservationW = 150;
+                reservationH = 30;
             }
 
             let minScale = 0.01;
@@ -435,7 +476,7 @@
                 let midScale = (minScale + maxScale) / 2;
                 
                 // Simulation du placement pour mesurer la hauteur
-                let currentHeight = packImages(articleElements, midScale, maxWidth, coverW, coverH, false);
+                let currentHeight = packImages(articleElements, midScale, maxWidth, reservationW, reservationH, false);
                 
                 if (currentHeight <= targetHeight) {
                     // Ça rentre ! On sauvegarde ce scale et on essaie de faire plus grand
@@ -448,7 +489,7 @@
             }
 
             // 5. Application du meilleur facteur d'échelle trouvé et placement final
-            packImages(articleElements, bestScale, maxWidth, coverW, coverH, true);
+            packImages(articleElements, bestScale, maxWidth, reservationW, reservationH, true);
 
             // 6. Affichage du bouton d'impression
             btnPrint.style.display = 'block';
